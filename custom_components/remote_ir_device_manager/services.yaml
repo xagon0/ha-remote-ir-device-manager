@@ -1,0 +1,127 @@
+learn_command:
+  name: Learn Command
+  description: Put an IR blaster into learning mode and store the learned command.
+  fields:
+    device_id:
+      name: Virtual Device
+      description: The virtual device to add the command to.
+      required: true
+      example: "living_room_tv"
+      selector:
+        text:
+    command_name:
+      name: Command Name
+      description: Name for the command (e.g., Power, Volume Up).
+      required: true
+      example: "Power"
+      selector:
+        text:
+    command_type:
+      name: Command Type
+      description: Type of command to learn.
+      default: "ir"
+      selector:
+        select:
+          options:
+            - value: "ir"
+              label: "IR (Infrared)"
+            - value: "rf"
+              label: "RF (Radio Frequency)"
+    timeout:
+      name: Timeout
+      description: Seconds to wait for the IR signal.
+      default: 30
+      selector:
+        number:
+          min: 10
+          max: 120
+          unit_of_measurement: seconds
+
+add_command:
+  name: Add Command
+  description: Add a command using a base64-encoded IR code.
+  fields:
+    device_id:
+      name: Virtual Device
+      description: The virtual device to add the command to.
+      required: true
+      example: "living_room_tv"
+      selector:
+        text:
+    command_name:
+      name: Command Name
+      description: Name for the command.
+      required: true
+      example: "Power"
+      selector:
+        text:
+    code:
+      name: IR Code
+      description: Base64-encoded IR code (with or without b64: prefix).
+      required: true
+      example: "JgAcAB0dHB44Hh..."
+      selector:
+        text:
+    command_type:
+      name: Command Type
+      description: Type of command.
+      default: "ir"
+      selector:
+        select:
+          options:
+            - value: "ir"
+              label: "IR (Infrared)"
+            - value: "rf"
+              label: "RF (Radio Frequency)"
+    icon:
+      name: Icon
+      description: MDI icon for the button entity.
+      example: "mdi:power"
+      selector:
+        icon:
+
+delete_command:
+  name: Delete Command
+  description: Remove a learned command from a virtual device.
+  fields:
+    device_id:
+      name: Virtual Device
+      description: The virtual device.
+      required: true
+      example: "living_room_tv"
+      selector:
+        text:
+    command_name:
+      name: Command Name
+      description: The command to delete.
+      required: true
+      example: "Power"
+      selector:
+        text:
+
+send_command:
+  name: Send Command
+  description: Send a learned IR command.
+  fields:
+    device_id:
+      name: Virtual Device
+      description: The virtual device.
+      required: true
+      example: "living_room_tv"
+      selector:
+        text:
+    command_name:
+      name: Command Name
+      description: The command to send.
+      required: true
+      example: "Power"
+      selector:
+        text:
+    num_repeats:
+      name: Repeat Count
+      description: Number of times to send the command.
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 10

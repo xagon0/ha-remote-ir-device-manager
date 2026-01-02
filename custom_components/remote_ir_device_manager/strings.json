@@ -1,0 +1,196 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Remote IR Device Manager",
+        "description": "This integration allows you to create virtual remote devices and learn IR commands from any IR blaster in Home Assistant."
+      }
+    },
+    "abort": {
+      "already_configured": "Integration is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Remote IR Device Manager",
+        "description": "What would you like to do?",
+        "menu_options": {
+          "add_device": "Add new virtual device",
+          "manage_device": "Manage existing device",
+          "delete_device": "Delete a device"
+        }
+      },
+      "add_device": {
+        "title": "Add Virtual Device",
+        "description": "Create a new virtual remote device.",
+        "data": {
+          "device_name": "Device Name",
+          "ir_blaster_entity_id": "IR Blaster"
+        },
+        "data_description": {
+          "device_name": "A friendly name for this remote (e.g., 'Living Room TV', 'Toilet')",
+          "ir_blaster_entity_id": "Select the IR blaster that will send commands for this device"
+        }
+      },
+      "select_device": {
+        "title": "Select Device",
+        "description": "Choose a device to manage.",
+        "data": {
+          "device_id": "Virtual Device"
+        }
+      },
+      "manage_device": {
+        "title": "Select Device",
+        "description": "Choose a device to manage.",
+        "data": {
+          "device_id": "Virtual Device"
+        }
+      },
+      "device_menu": {
+        "title": "Manage Device",
+        "description": "Manage commands for {device_name}",
+        "menu_options": {
+          "learn_command": "Learn new command",
+          "add_command_manual": "Add command manually (base64)",
+          "delete_command": "Delete a command",
+          "back": "Back to main menu"
+        }
+      },
+      "learn_command": {
+        "title": "Learn Command",
+        "description": "Point your remote at the IR blaster and press the button you want to learn.",
+        "data": {
+          "command_name": "Command Name",
+          "command_type": "Command Type",
+          "icon": "Icon (optional)"
+        },
+        "data_description": {
+          "command_name": "A name for this command (e.g., 'Power', 'Volume Up')",
+          "command_type": "Select IR for infrared or RF for radio frequency",
+          "icon": "MDI icon name (e.g., 'mdi:power')"
+        }
+      },
+      "add_command_manual": {
+        "title": "Add Command Manually",
+        "description": "Enter a base64-encoded IR code directly.",
+        "data": {
+          "command_name": "Command Name",
+          "code": "IR Code (base64)",
+          "command_type": "Command Type",
+          "icon": "Icon (optional)"
+        }
+      },
+      "delete_command": {
+        "title": "Delete Command",
+        "description": "Select a command to delete from {device_name}.",
+        "data": {
+          "command_name": "Command"
+        }
+      },
+      "delete_device": {
+        "title": "Delete Device",
+        "description": "Select a device to delete. This will remove all its learned commands.",
+        "data": {
+          "device_id": "Virtual Device"
+        }
+      },
+      "learning": {
+        "title": "Learning...",
+        "description": "Point your remote at the IR blaster and press the button now. Waiting for signal..."
+      }
+    },
+    "error": {
+      "device_name_exists": "A device with this name already exists.",
+      "command_name_exists": "A command with this name already exists on this device.",
+      "no_ir_blasters": "No IR blaster devices found. Please set up a Broadlink or other IR blaster integration first.",
+      "no_devices": "No virtual devices configured yet.",
+      "no_commands": "No commands configured for this device.",
+      "learn_failed": "Failed to learn command. Please try again.",
+      "learn_timeout": "Learning timed out. No signal received.",
+      "invalid_code": "Invalid base64 code format."
+    }
+  },
+  "services": {
+    "learn_command": {
+      "name": "Learn Command",
+      "description": "Put an IR blaster into learning mode and store the learned command.",
+      "fields": {
+        "device_id": {
+          "name": "Virtual Device",
+          "description": "The virtual device to add the command to."
+        },
+        "command_name": {
+          "name": "Command Name",
+          "description": "Name for the command (e.g., Power, Volume Up)."
+        },
+        "command_type": {
+          "name": "Command Type",
+          "description": "Type of command to learn (ir or rf)."
+        },
+        "timeout": {
+          "name": "Timeout",
+          "description": "Seconds to wait for the IR signal."
+        }
+      }
+    },
+    "add_command": {
+      "name": "Add Command",
+      "description": "Add a command using a base64-encoded IR code.",
+      "fields": {
+        "device_id": {
+          "name": "Virtual Device",
+          "description": "The virtual device to add the command to."
+        },
+        "command_name": {
+          "name": "Command Name",
+          "description": "Name for the command."
+        },
+        "code": {
+          "name": "IR Code",
+          "description": "Base64-encoded IR code."
+        },
+        "command_type": {
+          "name": "Command Type",
+          "description": "Type of command (ir or rf)."
+        },
+        "icon": {
+          "name": "Icon",
+          "description": "MDI icon for the button."
+        }
+      }
+    },
+    "delete_command": {
+      "name": "Delete Command",
+      "description": "Remove a learned command from a virtual device.",
+      "fields": {
+        "device_id": {
+          "name": "Virtual Device",
+          "description": "The virtual device."
+        },
+        "command_name": {
+          "name": "Command Name",
+          "description": "The command to delete."
+        }
+      }
+    },
+    "send_command": {
+      "name": "Send Command",
+      "description": "Send a learned IR command.",
+      "fields": {
+        "device_id": {
+          "name": "Virtual Device",
+          "description": "The virtual device."
+        },
+        "command_name": {
+          "name": "Command Name",
+          "description": "The command to send."
+        },
+        "num_repeats": {
+          "name": "Repeat Count",
+          "description": "Number of times to send the command."
+        }
+      }
+    }
+  }
+}
