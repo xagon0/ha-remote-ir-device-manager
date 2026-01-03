@@ -89,11 +89,14 @@ class VirtualRemoteEntity(RemoteEntity):
     @property
     def available(self) -> bool:
         """Return if entity is available."""
-        # Check if the IR blaster entity exists and is available
+        # Check if the IR blaster entity is available
+        # During startup, state may not exist yet - assume available
         state = self._coordinator.hass.states.get(
             self._virtual_device.ir_blaster_entity_id
         )
-        return state is not None and state.state != "unavailable"
+        if state is None:
+            return True
+        return state.state != "unavailable"
 
     @property
     def activity_list(self) -> list[str]:
