@@ -78,11 +78,21 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
         return coordinator
 
     def _get_ir_blasters(self) -> dict[str, str]:
-        """Get available IR blaster entities."""
+        """Get available IR blaster entities (excluding our own virtual remotes)."""
+        from homeassistant.helpers import entity_registry as er
+
         blasters = {}
         entity_ids = self.hass.states.async_entity_ids("remote")
 
+        # Get entity registry to filter out our own virtual remotes
+        ent_reg = er.async_get(self.hass)
+
         for entity_id in entity_ids:
+            # Skip entities created by this integration
+            entry = ent_reg.async_get(entity_id)
+            if entry and entry.platform == DOMAIN:
+                continue
+
             state = self.hass.states.get(entity_id)
             if state:
                 friendly_name = state.attributes.get("friendly_name", entity_id)
