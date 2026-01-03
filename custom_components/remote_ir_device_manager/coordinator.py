@@ -75,6 +75,10 @@ class IRDeviceCoordinator:
         )
         await self._storage.async_add_device(device)
         _LOGGER.info("Added virtual device: %s", name)
+
+        # Reload to create the new remote entity
+        await self._async_reload_entry()
+
         return device
 
     async def async_remove_device(self, device_id: str) -> bool:
@@ -82,6 +86,8 @@ class IRDeviceCoordinator:
         result = await self._storage.async_remove_device(device_id)
         if result:
             _LOGGER.info("Removed virtual device: %s", device_id)
+            # Reload to remove the orphaned entities
+            await self._async_reload_entry()
         return result
 
     async def async_add_command(
