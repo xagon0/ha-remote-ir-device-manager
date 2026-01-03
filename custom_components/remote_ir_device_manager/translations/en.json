@@ -57,6 +57,15 @@
           "back": "Back to main menu"
         }
       },
+      "command_added": {
+        "title": "Command Added",
+        "description": "Command added to {device_name}. What would you like to do next?",
+        "menu_options": {
+          "learn_command": "Learn another command",
+          "add_command_manual": "Add another command manually",
+          "finish": "Done"
+        }
+      },
       "learn_command": {
         "title": "Learn Command",
         "description": "Point your remote at the IR blaster and press the button you want to learn.",

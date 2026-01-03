@@ -221,6 +221,28 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
         self._selected_device_id = None
         return await self.async_step_init()
 
+    async def async_step_command_added(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show menu after successfully adding a command."""
+        coordinator = self._get_coordinator()
+        device = coordinator.get_device(self._selected_device_id)
+
+        if device is None:
+            return self.async_create_entry(title="", data={})
+
+        return self.async_show_menu(
+            step_id="command_added",
+            menu_options=["learn_command", "add_command_manual", "finish"],
+            description_placeholders={"device_name": device.name},
+        )
+
+    async def async_step_finish(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Finish adding commands and exit."""
+        return self.async_create_entry(title="", data={})
+
     async def async_step_learn_command(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -256,7 +278,7 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
                                 self._selected_device_id, command_name, icon=icon
                             )
 
-                        return self.async_create_entry(title="", data={})
+                        return await self.async_step_command_added()
                     else:
                         # Learning succeeded but code retrieval failed
                         # Redirect to manual input with pre-filled name
@@ -331,7 +353,7 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
                         command_type,
                         icon,
                     )
-                    return self.async_create_entry(title="", data={})
+                    return await self.async_step_command_added()
                 except HomeAssistantError as err:
                     _LOGGER.error("Failed to add command: %s", err)
                     if "base64" in str(err).lower():
