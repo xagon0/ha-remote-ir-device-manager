@@ -1,12 +1,12 @@
 {
   "domain": "remote_ir_device_manager",
   "name": "Remote IR Device Manager",
-  "codeowners": [],
+  "codeowners": ["@xagon0"],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/your-username/ha-remote-ir-device-manager",
+  "documentation": "https://github.com/xagon0/ha-remote-ir-device-manager",
   "iot_class": "calculated",
-  "issue_tracker": "https://github.com/your-username/ha-remote-ir-device-manager/issues",
+  "issue_tracker": "https://github.com/xagon0/ha-remote-ir-device-manager/issues",
   "requirements": [],
   "version": "0.1.0"
 }

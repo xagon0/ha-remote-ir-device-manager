@@ -15,6 +15,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.selector import IconSelector, IconSelectorConfig
 
 from .const import (
     CONF_COMMAND_CODE,
@@ -273,7 +274,7 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
                 vol.Optional(CONF_COMMAND_TYPE, default=COMMAND_TYPE_IR): vol.In(
                     {COMMAND_TYPE_IR: "IR (Infrared)", COMMAND_TYPE_RF: "RF (Radio Frequency)"}
                 ),
-                vol.Optional("icon"): str,
+                vol.Optional("icon"): IconSelector(IconSelectorConfig()),
             }
         )
 
@@ -346,7 +347,7 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
                 ): vol.In(
                     {COMMAND_TYPE_IR: "IR (Infrared)", COMMAND_TYPE_RF: "RF (Radio Frequency)"}
                 ),
-                vol.Optional("icon", default=defaults.get("icon", "")): str,
+                vol.Optional("icon"): IconSelector(IconSelectorConfig()),
             }
         )
 

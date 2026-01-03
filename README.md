@@ -17,7 +17,7 @@ A Home Assistant custom integration that provides a UI-driven workflow for manag
 
 1. Open HACS in Home Assistant
 2. Click the three dots menu → Custom repositories
-3. Add this repository URL with category "Integration"
+3. Add `https://github.com/xagon0/ha-remote-ir-device-manager` with category "Integration"
 4. Search for "Remote IR Device Manager" and install
 5. Restart Home Assistant
 6. Go to Settings → Devices & Services → Add Integration → "Remote IR Device Manager"
