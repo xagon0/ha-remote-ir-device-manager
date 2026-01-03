@@ -270,6 +270,7 @@ class IRDeviceCoordinator:
                 setattr(command, key, value)
 
         await self._storage.async_save()
+        await self._async_reload_entry()
         return True
 
     async def _async_reload_entry(self) -> None:

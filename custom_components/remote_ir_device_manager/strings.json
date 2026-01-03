@@ -53,6 +53,7 @@
         "menu_options": {
           "learn_command": "Learn new command",
           "add_command_manual": "Add command manually (base64)",
+          "edit_command": "Edit a command",
           "delete_command": "Delete a command",
           "back": "Back to main menu"
         }
@@ -88,6 +89,20 @@
           "code": "IR Code (base64)",
           "command_type": "Command Type",
           "icon": "Icon (optional)"
+        }
+      },
+      "edit_command": {
+        "title": "Edit Command",
+        "description": "Select a command to edit from {device_name}.",
+        "data": {
+          "command_name": "Command"
+        }
+      },
+      "edit_command_form": {
+        "title": "Edit Command",
+        "description": "Editing '{command_name}' on {device_name}.",
+        "data": {
+          "icon": "Icon"
         }
       },
       "delete_command": {

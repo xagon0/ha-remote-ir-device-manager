@@ -69,6 +69,7 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
         """Initialize options flow."""
         self._config_entry = config_entry
         self._selected_device_id: str | None = None
+        self._selected_command_name: str | None = None
 
     def _get_coordinator(self) -> "IRDeviceCoordinator":
         """Get the coordinator from hass.data."""
@@ -208,6 +209,7 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
             menu_options=[
                 "learn_command",
                 "add_command_manual",
+                "edit_command",
                 "delete_command",
                 "back",
             ],
@@ -388,6 +390,95 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
             data_schema=schema,
             errors=errors,
             description_placeholders={"device_name": device.name},
+        )
+
+    async def async_step_edit_command(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle selecting a command to edit."""
+        errors: dict[str, str] = {}
+        coordinator = self._get_coordinator()
+        device = coordinator.get_device(self._selected_device_id)
+
+        if device is None:
+            return await self.async_step_init()
+
+        commands = {
+            cmd.name: f"{cmd.name} ({cmd.command_type.upper()})"
+            for cmd in device.commands.values()
+        }
+
+        if not commands:
+            errors["base"] = "no_commands"
+            return self.async_show_form(
+                step_id="edit_command",
+                data_schema=vol.Schema({}),
+                errors=errors,
+                description_placeholders={"device_name": device.name},
+            )
+
+        if user_input is not None:
+            self._selected_command_name = user_input[CONF_COMMAND_NAME]
+            return await self.async_step_edit_command_form()
+
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_COMMAND_NAME): vol.In(commands),
+            }
+        )
+
+        return self.async_show_form(
+            step_id="edit_command",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={"device_name": device.name},
+        )
+
+    async def async_step_edit_command_form(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle editing a command's properties."""
+        errors: dict[str, str] = {}
+        coordinator = self._get_coordinator()
+        device = coordinator.get_device(self._selected_device_id)
+
+        if device is None:
+            return await self.async_step_init()
+
+        command = device.commands.get(self._selected_command_name.lower())
+        if command is None:
+            return await self.async_step_device_menu()
+
+        if user_input is not None:
+            new_icon = user_input.get("icon")
+            try:
+                await coordinator.async_update_command(
+                    self._selected_device_id,
+                    self._selected_command_name,
+                    icon=new_icon,
+                )
+                self._selected_command_name = None
+                return await self.async_step_device_menu()
+            except Exception:
+                _LOGGER.exception("Unexpected error updating command")
+                errors["base"] = "unknown"
+
+        schema = vol.Schema(
+            {
+                vol.Optional("icon", default=command.icon or ""): IconSelector(
+                    IconSelectorConfig()
+                ),
+            }
+        )
+
+        return self.async_show_form(
+            step_id="edit_command_form",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={
+                "device_name": device.name,
+                "command_name": command.name,
+            },
         )
 
     async def async_step_delete_command(
