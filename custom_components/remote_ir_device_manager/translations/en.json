@@ -55,6 +55,7 @@
           "add_command_manual": "Add command manually (base64)",
           "edit_command": "Edit a command",
           "delete_command": "Delete a command",
+          "configure_device_type": "Configure device type",
           "back": "Back to main menu"
         }
       },
@@ -103,6 +104,39 @@
         "description": "Editing '{command_name}' on {device_name}.",
         "data": {
           "icon": "Icon"
+        }
+      },
+      "configure_device_type": {
+        "title": "Configure Device Type",
+        "description": "Select the type of device for {device_name}. This determines what entity types are created.",
+        "data": {
+          "device_type": "Device Type"
+        }
+      },
+      "configure_light": {
+        "title": "Configure Light",
+        "description": "Map commands to light controls for {device_name}. For brightness/color temp levels, enter command names separated by commas (dimmest to brightest, or coolest to warmest).",
+        "data": {
+          "turn_on": "Power On Command",
+          "turn_off": "Power Off Command",
+          "brightness_mode": "Brightness Control",
+          "brightness_levels": "Brightness Level Commands (comma-separated)",
+          "brightness_up": "Brightness Up Command",
+          "brightness_down": "Brightness Down Command",
+          "color_temp_mode": "Color Temperature Control",
+          "color_temp_levels": "Color Temp Commands (comma-separated, cool to warm)",
+          "color_temp_up": "Cooler Command",
+          "color_temp_down": "Warmer Command",
+          "effect_nightlight": "Nightlight Command"
+        }
+      },
+      "configure_cover": {
+        "title": "Configure Cover",
+        "description": "Map commands to cover controls for {device_name}.",
+        "data": {
+          "open": "Open Command",
+          "close": "Close Command",
+          "stop": "Stop Command"
         }
       },
       "delete_command": {

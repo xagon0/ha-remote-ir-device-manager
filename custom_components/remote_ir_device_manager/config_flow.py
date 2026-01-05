@@ -23,11 +23,22 @@ from .const import (
     CONF_COMMAND_TYPE,
     CONF_DEVICE_ID,
     CONF_DEVICE_NAME,
+    CONF_DEVICE_TYPE,
     CONF_IR_BLASTER,
     COMMAND_TYPE_IR,
     COMMAND_TYPE_RF,
+    DEVICE_TYPE_GENERIC,
+    DEVICE_TYPE_LIGHT,
+    DEVICE_TYPE_COVER,
+    DEVICE_TYPE_FAN,
+    DEVICE_TYPES,
+    BRIGHTNESS_MODE_NONE,
+    BRIGHTNESS_MODE_DISCRETE,
+    BRIGHTNESS_MODE_RELATIVE,
+    BRIGHTNESS_MODE_BOTH,
     DOMAIN,
 )
+from .storage import EntityConfig
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -211,6 +222,7 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
                 "add_command_manual",
                 "edit_command",
                 "delete_command",
+                "configure_device_type",
                 "back",
             ],
             description_placeholders={"device_name": device.name},
@@ -479,6 +491,215 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
                 "device_name": device.name,
                 "command_name": command.name,
             },
+        )
+
+    async def async_step_configure_device_type(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Configure the device type (generic, light, cover, fan)."""
+        errors: dict[str, str] = {}
+        coordinator = self._get_coordinator()
+        device = coordinator.get_device(self._selected_device_id)
+
+        if device is None:
+            return await self.async_step_init()
+
+        if user_input is not None:
+            device_type = user_input[CONF_DEVICE_TYPE]
+            await coordinator.async_update_device_type(
+                self._selected_device_id, device_type
+            )
+            # If not generic, proceed to entity configuration
+            if device_type == DEVICE_TYPE_LIGHT:
+                return await self.async_step_configure_light()
+            elif device_type == DEVICE_TYPE_COVER:
+                return await self.async_step_configure_cover()
+            return await self.async_step_device_menu()
+
+        schema = vol.Schema({
+            vol.Required(CONF_DEVICE_TYPE, default=device.device_type): vol.In(DEVICE_TYPES)
+        })
+
+        return self.async_show_form(
+            step_id="configure_device_type",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={"device_name": device.name},
+        )
+
+    async def async_step_configure_light(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Configure light entity command mappings."""
+        errors: dict[str, str] = {}
+        coordinator = self._get_coordinator()
+        device = coordinator.get_device(self._selected_device_id)
+
+        if device is None:
+            return await self.async_step_init()
+
+        # Get list of available commands for selection
+        commands = {"": "(Not configured)"}
+        commands.update({cmd.name: cmd.name for cmd in device.commands.values()})
+
+        light_config = device.entity_configs.get("light")
+        current_mappings = light_config.command_mappings if light_config else {}
+        current_options = light_config.options if light_config else {}
+
+        if user_input is not None:
+            # Build command mappings from user input
+            mappings: dict[str, Any] = {}
+
+            # Power commands
+            if user_input.get("turn_on"):
+                mappings["turn_on"] = user_input["turn_on"]
+            if user_input.get("turn_off"):
+                mappings["turn_off"] = user_input["turn_off"]
+
+            # Brightness
+            brightness_mode = user_input.get("brightness_mode", BRIGHTNESS_MODE_NONE)
+            if brightness_mode in (BRIGHTNESS_MODE_DISCRETE, BRIGHTNESS_MODE_BOTH):
+                # Parse comma-separated brightness level commands
+                levels_str = user_input.get("brightness_levels", "")
+                if levels_str:
+                    levels = [l.strip() for l in levels_str.split(",") if l.strip()]
+                    if levels:
+                        mappings["brightness_levels"] = levels
+
+            if brightness_mode in (BRIGHTNESS_MODE_RELATIVE, BRIGHTNESS_MODE_BOTH):
+                if user_input.get("brightness_up"):
+                    mappings["brightness_up"] = user_input["brightness_up"]
+                if user_input.get("brightness_down"):
+                    mappings["brightness_down"] = user_input["brightness_down"]
+
+            # Color temp
+            color_temp_mode = user_input.get("color_temp_mode", BRIGHTNESS_MODE_NONE)
+            if color_temp_mode in (BRIGHTNESS_MODE_DISCRETE, BRIGHTNESS_MODE_BOTH):
+                levels_str = user_input.get("color_temp_levels", "")
+                if levels_str:
+                    levels = [l.strip() for l in levels_str.split(",") if l.strip()]
+                    if levels:
+                        mappings["color_temp_levels"] = levels
+
+            if color_temp_mode in (BRIGHTNESS_MODE_RELATIVE, BRIGHTNESS_MODE_BOTH):
+                if user_input.get("color_temp_up"):
+                    mappings["color_temp_up"] = user_input["color_temp_up"]
+                if user_input.get("color_temp_down"):
+                    mappings["color_temp_down"] = user_input["color_temp_down"]
+
+            # Effects (nightlight)
+            effects: dict[str, str] = {}
+            if user_input.get("effect_nightlight"):
+                effects["Nightlight"] = user_input["effect_nightlight"]
+            if effects:
+                mappings["effects"] = effects
+
+            # Create or update config
+            config = EntityConfig(
+                entity_type="light",
+                enabled=True,
+                command_mappings=mappings,
+                state=current_mappings.get("state", {"is_on": False, "brightness": 255, "color_temp_index": 2}),
+                options={
+                    "brightness_mode": brightness_mode,
+                    "color_temp_mode": color_temp_mode,
+                },
+            )
+
+            await coordinator.async_update_entity_config(
+                self._selected_device_id, "light", config
+            )
+
+            return await self.async_step_device_menu()
+
+        # Build form with current values
+        current_brightness_levels = current_mappings.get("brightness_levels", [])
+        current_color_temp_levels = current_mappings.get("color_temp_levels", [])
+        current_effects = current_mappings.get("effects", {})
+
+        schema = vol.Schema({
+            vol.Optional("turn_on", default=current_mappings.get("turn_on", "")): vol.In(commands),
+            vol.Optional("turn_off", default=current_mappings.get("turn_off", "")): vol.In(commands),
+            vol.Optional("brightness_mode", default=current_options.get("brightness_mode", BRIGHTNESS_MODE_NONE)): vol.In({
+                BRIGHTNESS_MODE_NONE: "No brightness control",
+                BRIGHTNESS_MODE_DISCRETE: "Discrete levels",
+                BRIGHTNESS_MODE_RELATIVE: "Up/Down buttons",
+                BRIGHTNESS_MODE_BOTH: "Both",
+            }),
+            vol.Optional("brightness_levels", default=",".join(current_brightness_levels)): str,
+            vol.Optional("brightness_up", default=current_mappings.get("brightness_up", "")): vol.In(commands),
+            vol.Optional("brightness_down", default=current_mappings.get("brightness_down", "")): vol.In(commands),
+            vol.Optional("color_temp_mode", default=current_options.get("color_temp_mode", BRIGHTNESS_MODE_NONE)): vol.In({
+                BRIGHTNESS_MODE_NONE: "No color temp control",
+                BRIGHTNESS_MODE_DISCRETE: "Discrete presets (cool to warm)",
+                BRIGHTNESS_MODE_RELATIVE: "Warmer/Cooler buttons",
+                BRIGHTNESS_MODE_BOTH: "Both",
+            }),
+            vol.Optional("color_temp_levels", default=",".join(current_color_temp_levels)): str,
+            vol.Optional("color_temp_up", default=current_mappings.get("color_temp_up", "")): vol.In(commands),
+            vol.Optional("color_temp_down", default=current_mappings.get("color_temp_down", "")): vol.In(commands),
+            vol.Optional("effect_nightlight", default=current_effects.get("Nightlight", "")): vol.In(commands),
+        })
+
+        return self.async_show_form(
+            step_id="configure_light",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={"device_name": device.name},
+        )
+
+    async def async_step_configure_cover(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Configure cover entity command mappings."""
+        errors: dict[str, str] = {}
+        coordinator = self._get_coordinator()
+        device = coordinator.get_device(self._selected_device_id)
+
+        if device is None:
+            return await self.async_step_init()
+
+        # Get list of available commands for selection
+        commands = {"": "(Not configured)"}
+        commands.update({cmd.name: cmd.name for cmd in device.commands.values()})
+
+        cover_config = device.entity_configs.get("cover")
+        current_mappings = cover_config.command_mappings if cover_config else {}
+
+        if user_input is not None:
+            mappings: dict[str, str] = {}
+            if user_input.get("open"):
+                mappings["open"] = user_input["open"]
+            if user_input.get("close"):
+                mappings["close"] = user_input["close"]
+            if user_input.get("stop"):
+                mappings["stop"] = user_input["stop"]
+
+            config = EntityConfig(
+                entity_type="cover",
+                enabled=True,
+                command_mappings=mappings,
+                state={"position": 50},
+                options={"device_class": "shade"},
+            )
+
+            await coordinator.async_update_entity_config(
+                self._selected_device_id, "cover", config
+            )
+
+            return await self.async_step_device_menu()
+
+        schema = vol.Schema({
+            vol.Optional("open", default=current_mappings.get("open", "")): vol.In(commands),
+            vol.Optional("close", default=current_mappings.get("close", "")): vol.In(commands),
+            vol.Optional("stop", default=current_mappings.get("stop", "")): vol.In(commands),
+        })
+
+        return self.async_show_form(
+            step_id="configure_cover",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={"device_name": device.name},
         )
 
     async def async_step_delete_command(

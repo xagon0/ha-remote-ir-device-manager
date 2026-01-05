@@ -12,7 +12,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
 from .adapters import AdapterRegistry
-from .storage import IRCommand, IRDeviceStorage, VirtualDevice
+from .const import DEVICE_TYPE_LIGHT, DEVICE_TYPE_COVER, DEVICE_TYPE_FAN
+from .storage import IRCommand, IRDeviceStorage, VirtualDevice, EntityConfig
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -272,6 +273,72 @@ class IRDeviceCoordinator:
         await self._storage.async_save()
         await self._async_reload_entry()
         return True
+
+    async def async_update_device_type(
+        self, device_id: str, device_type: str
+    ) -> bool:
+        """Update device type and initialize default entity configs."""
+        device = self._storage.get_device(device_id)
+        if device is None:
+            return False
+
+        device.device_type = device_type
+
+        # Initialize default entity config for the new type
+        if device_type == DEVICE_TYPE_LIGHT and "light" not in device.entity_configs:
+            device.entity_configs["light"] = EntityConfig(
+                entity_type="light",
+                enabled=True,
+                command_mappings={},
+                state={"is_on": False, "brightness": 255, "color_temp_index": 2},
+                options={"brightness_mode": "none"},
+            )
+        elif device_type == DEVICE_TYPE_COVER and "cover" not in device.entity_configs:
+            device.entity_configs["cover"] = EntityConfig(
+                entity_type="cover",
+                enabled=True,
+                command_mappings={},
+                state={"position": 50},
+                options={"device_class": "shade"},
+            )
+        elif device_type == DEVICE_TYPE_FAN and "fan" not in device.entity_configs:
+            device.entity_configs["fan"] = EntityConfig(
+                entity_type="fan",
+                enabled=True,
+                command_mappings={},
+                state={"is_on": False, "speed": 50},
+                options={},
+            )
+
+        await self._storage.async_save()
+        _LOGGER.info("Updated device '%s' type to '%s'", device.name, device_type)
+        await self._async_reload_entry()
+        return True
+
+    async def async_update_entity_config(
+        self, device_id: str, entity_type: str, config: EntityConfig
+    ) -> bool:
+        """Update entity configuration."""
+        device = self._storage.get_device(device_id)
+        if device is None:
+            return False
+
+        device.entity_configs[entity_type] = config
+        await self._storage.async_save()
+        _LOGGER.info(
+            "Updated %s config for device '%s'", entity_type, device.name
+        )
+        await self._async_reload_entry()
+        return True
+
+    async def async_save_entity_state(
+        self, device_id: str, entity_type: str, state: dict[str, Any]
+    ) -> None:
+        """Save entity state to storage (for assumed state persistence)."""
+        device = self._storage.get_device(device_id)
+        if device and entity_type in device.entity_configs:
+            device.entity_configs[entity_type].state = state
+            await self._storage.async_save()
 
     async def _async_reload_entry(self) -> None:
         """Reload the config entry to refresh entities."""

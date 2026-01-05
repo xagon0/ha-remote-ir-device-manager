@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from .const import STORAGE_KEY, STORAGE_VERSION
+from .const import STORAGE_KEY, STORAGE_VERSION, DEVICE_TYPE_GENERIC
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,6 +44,36 @@ class IRCommand:
 
 
 @dataclass
+class EntityConfig:
+    """Configuration for a specific entity type on a device."""
+
+    entity_type: str  # "light", "cover", "fan"
+    enabled: bool = True
+    command_mappings: dict[str, Any] = field(default_factory=dict)
+    # For light: {"turn_on": "power_on", "brightness_levels": ["b10", "b20", ...]}
+    # For cover: {"open": "up", "close": "down", "stop": "stop"}
+    state: dict[str, Any] = field(default_factory=dict)
+    # Persisted assumed state: {"is_on": True, "brightness": 128}
+    options: dict[str, Any] = field(default_factory=dict)
+    # Entity-specific options: {"brightness_mode": "discrete"}
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> EntityConfig:
+        """Create from dictionary."""
+        return cls(
+            entity_type=data["entity_type"],
+            enabled=data.get("enabled", True),
+            command_mappings=data.get("command_mappings", {}),
+            state=data.get("state", {}),
+            options=data.get("options", {}),
+        )
+
+
+@dataclass
 class VirtualDevice:
     """A virtual remote device."""
 
@@ -52,6 +82,8 @@ class VirtualDevice:
     ir_blaster_entity_id: str
     commands: dict[str, IRCommand] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: dt_util.utcnow().isoformat())
+    device_type: str = DEVICE_TYPE_GENERIC
+    entity_configs: dict[str, EntityConfig] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -61,6 +93,8 @@ class VirtualDevice:
             "ir_blaster_entity_id": self.ir_blaster_entity_id,
             "commands": {k: v.to_dict() for k, v in self.commands.items()},
             "created_at": self.created_at,
+            "device_type": self.device_type,
+            "entity_configs": {k: v.to_dict() for k, v in self.entity_configs.items()},
         }
 
     @classmethod
@@ -70,12 +104,18 @@ class VirtualDevice:
         for cmd_key, cmd_data in data.get("commands", {}).items():
             commands[cmd_key] = IRCommand.from_dict(cmd_data)
 
+        entity_configs = {}
+        for config_key, config_data in data.get("entity_configs", {}).items():
+            entity_configs[config_key] = EntityConfig.from_dict(config_data)
+
         return cls(
             id=data["id"],
             name=data["name"],
             ir_blaster_entity_id=data["ir_blaster_entity_id"],
             commands=commands,
             created_at=data.get("created_at", dt_util.utcnow().isoformat()),
+            device_type=data.get("device_type", DEVICE_TYPE_GENERIC),
+            entity_configs=entity_configs,
         )
 
 
@@ -114,10 +154,12 @@ class IRDeviceStorage:
             self._devices = {}
             return
 
-        # Handle future storage migrations here
-        # stored_version = data.get("version", 1)
-        # if stored_version < STORAGE_VERSION:
-        #     data = self._migrate_data(data, stored_version)
+        # Handle storage migrations
+        stored_version = data.get("version", 1)
+        if stored_version < 2:
+            data = self._migrate_v1_to_v2(data)
+            # Save migrated data
+            await self._store.async_save(data)
 
         self._devices = {}
         for device_id, device_data in data.get("virtual_devices", {}).items():
@@ -126,13 +168,24 @@ class IRDeviceStorage:
             except (KeyError, TypeError) as err:
                 _LOGGER.warning("Failed to load device %s: %s", device_id, err)
 
+    def _migrate_v1_to_v2(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Migrate from v1 to v2 - add device_type and entity_configs."""
+        _LOGGER.info("Migrating storage from v1 to v2")
+        for device_data in data.get("virtual_devices", {}).values():
+            # Add new fields with defaults
+            device_data.setdefault("device_type", DEVICE_TYPE_GENERIC)
+            device_data.setdefault("entity_configs", {})
+        data["version"] = 2
+        return data
+
     async def async_save(self) -> None:
         """Save data to storage."""
         data = {
+            "version": STORAGE_VERSION,
             "virtual_devices": {
                 device_id: device.to_dict()
                 for device_id, device in self._devices.items()
-            }
+            },
         }
         await self._store.async_save(data)
 
