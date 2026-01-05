@@ -81,6 +81,7 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
         self._config_entry = config_entry
         self._selected_device_id: str | None = None
         self._selected_command_name: str | None = None
+        self._prefilled_command_data: dict[str, Any] | None = None
 
     def _get_coordinator(self) -> "IRDeviceCoordinator":
         """Get the coordinator from hass.data."""
@@ -111,6 +112,36 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
                 blasters[entity_id] = friendly_name
 
         return blasters
+
+    def _parse_level_commands(
+        self,
+        user_input: dict[str, Any],
+        mode_key: str,
+        levels_key: str,
+        up_key: str,
+        down_key: str,
+    ) -> dict[str, Any]:
+        """Parse discrete/relative level commands from user input.
+
+        Handles the common pattern for brightness and color temp settings.
+        """
+        result: dict[str, Any] = {}
+        mode = user_input.get(mode_key, BRIGHTNESS_MODE_NONE)
+
+        if mode in (BRIGHTNESS_MODE_DISCRETE, BRIGHTNESS_MODE_BOTH):
+            levels_str = user_input.get(levels_key, "")
+            if levels_str:
+                levels = [level.strip() for level in levels_str.split(",") if level.strip()]
+                if levels:
+                    result[levels_key] = levels
+
+        if mode in (BRIGHTNESS_MODE_RELATIVE, BRIGHTNESS_MODE_BOTH):
+            if user_input.get(up_key):
+                result[up_key] = user_input[up_key]
+            if user_input.get(down_key):
+                result[down_key] = user_input[down_key]
+
+        return result
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -274,7 +305,7 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
             icon = user_input.get("icon")
 
             # Check for duplicate command
-            if command_name.lower() in device.commands:
+            if coordinator.command_name_exists(self._selected_device_id, command_name):
                 errors[CONF_COMMAND_NAME] = "command_name_exists"
             else:
                 try:
@@ -295,15 +326,13 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
                         return await self.async_step_command_added()
                     else:
                         # Learning succeeded but code retrieval failed
-                        # Redirect to manual input with pre-filled name
-                        return await self.async_step_add_command_manual(
-                            user_input={
-                                CONF_COMMAND_NAME: command_name,
-                                CONF_COMMAND_TYPE: command_type,
-                                "icon": icon or "",
-                                "_prefilled": True,
-                            }
-                        )
+                        # Store prefilled data and redirect to manual input
+                        self._prefilled_command_data = {
+                            CONF_COMMAND_NAME: command_name,
+                            CONF_COMMAND_TYPE: command_type,
+                            "icon": icon or "",
+                        }
+                        return await self.async_step_add_command_manual()
                 except HomeAssistantError as err:
                     _LOGGER.error("Learning failed: %s", err)
                     if "timeout" in str(err).lower():
@@ -342,21 +371,18 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
         if device is None:
             return await self.async_step_init()
 
-        # Check if this is a prefilled redirect from learn_command
-        # Use .get() to avoid mutating the original dict
-        prefilled = user_input.get("_prefilled", False) if user_input else False
-        if prefilled and user_input:
-            # Create a copy without the internal key for processing
-            user_input = {k: v for k, v in user_input.items() if k != "_prefilled"}
+        # Check if we have prefilled data from learn_command redirect
+        prefilled_data = self._prefilled_command_data
+        self._prefilled_command_data = None  # Clear after reading
 
-        if user_input is not None and not prefilled:
+        if user_input is not None:
             command_name = user_input[CONF_COMMAND_NAME]
             code = user_input[CONF_COMMAND_CODE]
             command_type = user_input.get(CONF_COMMAND_TYPE, COMMAND_TYPE_IR)
             icon = user_input.get("icon")
 
             # Check for duplicate command
-            if command_name.lower() in device.commands:
+            if coordinator.command_name_exists(self._selected_device_id, command_name):
                 errors[CONF_COMMAND_NAME] = "command_name_exists"
             else:
                 try:
@@ -379,7 +405,7 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
                     errors["base"] = "unknown"
 
         # Build schema with prefilled values if available
-        defaults = user_input or {}
+        defaults = prefilled_data or user_input or {}
         schema = vol.Schema(
             {
                 vol.Required(
@@ -556,36 +582,19 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
             if user_input.get("turn_off"):
                 mappings["turn_off"] = user_input["turn_off"]
 
-            # Brightness
+            # Brightness - use helper for discrete/relative parsing
             brightness_mode = user_input.get("brightness_mode", BRIGHTNESS_MODE_NONE)
-            if brightness_mode in (BRIGHTNESS_MODE_DISCRETE, BRIGHTNESS_MODE_BOTH):
-                # Parse comma-separated brightness level commands
-                levels_str = user_input.get("brightness_levels", "")
-                if levels_str:
-                    levels = [l.strip() for l in levels_str.split(",") if l.strip()]
-                    if levels:
-                        mappings["brightness_levels"] = levels
+            mappings.update(self._parse_level_commands(
+                user_input, "brightness_mode", "brightness_levels",
+                "brightness_up", "brightness_down"
+            ))
 
-            if brightness_mode in (BRIGHTNESS_MODE_RELATIVE, BRIGHTNESS_MODE_BOTH):
-                if user_input.get("brightness_up"):
-                    mappings["brightness_up"] = user_input["brightness_up"]
-                if user_input.get("brightness_down"):
-                    mappings["brightness_down"] = user_input["brightness_down"]
-
-            # Color temp
+            # Color temp - use helper for discrete/relative parsing
             color_temp_mode = user_input.get("color_temp_mode", BRIGHTNESS_MODE_NONE)
-            if color_temp_mode in (BRIGHTNESS_MODE_DISCRETE, BRIGHTNESS_MODE_BOTH):
-                levels_str = user_input.get("color_temp_levels", "")
-                if levels_str:
-                    levels = [l.strip() for l in levels_str.split(",") if l.strip()]
-                    if levels:
-                        mappings["color_temp_levels"] = levels
-
-            if color_temp_mode in (BRIGHTNESS_MODE_RELATIVE, BRIGHTNESS_MODE_BOTH):
-                if user_input.get("color_temp_up"):
-                    mappings["color_temp_up"] = user_input["color_temp_up"]
-                if user_input.get("color_temp_down"):
-                    mappings["color_temp_down"] = user_input["color_temp_down"]
+            mappings.update(self._parse_level_commands(
+                user_input, "color_temp_mode", "color_temp_levels",
+                "color_temp_up", "color_temp_down"
+            ))
 
             # Effects (nightlight)
             effects: dict[str, str] = {}
@@ -599,7 +608,7 @@ class RemoteIRDeviceManagerOptionsFlow(OptionsFlow):
                 entity_type="light",
                 enabled=True,
                 command_mappings=mappings,
-                state=current_mappings.get("state", {"is_on": False, "brightness": 255, "color_temp_index": 2}),
+                state=light_config.state if light_config else {"is_on": False, "brightness": 255, "color_temp_index": 2},
                 options={
                     "brightness_mode": brightness_mode,
                     "color_temp_mode": color_temp_mode,

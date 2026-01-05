@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .base_entity import IRDeviceEntityMixin
 from .const import DOMAIN
 from .storage import IRCommand, VirtualDevice
 
@@ -44,7 +45,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class IRCommandButton(ButtonEntity):
+class IRCommandButton(IRDeviceEntityMixin, ButtonEntity):
     """Button entity for an IR command."""
 
     _attr_has_entity_name = True
@@ -77,18 +78,6 @@ class IRCommandButton(ButtonEntity):
             model="Virtual Remote",
             sw_version="1.0",
         )
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        # Check if the IR blaster entity is available
-        # During startup, state may not exist yet - assume available
-        state = self._coordinator.hass.states.get(
-            self._virtual_device.ir_blaster_entity_id
-        )
-        if state is None:
-            return True
-        return state.state != "unavailable"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

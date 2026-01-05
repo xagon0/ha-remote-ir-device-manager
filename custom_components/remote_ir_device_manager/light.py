@@ -18,6 +18,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .base_entity import IRDeviceEntityMixin
 from .const import DOMAIN, DEVICE_TYPE_LIGHT, BRIGHTNESS_MODE_NONE, COLOR_TEMP_PRESETS
 from .storage import VirtualDevice, EntityConfig
 
@@ -54,7 +55,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class IRLight(LightEntity):
+class IRLight(IRDeviceEntityMixin, LightEntity):
     """Light entity for an IR-controlled light."""
 
     _attr_has_entity_name = True
@@ -140,17 +141,6 @@ class IRLight(LightEntity):
         self._attr_supported_features = features
 
     @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        # Check if the IR blaster entity is available
-        state = self._coordinator.hass.states.get(
-            self._virtual_device.ir_blaster_entity_id
-        )
-        if state is None:
-            return True
-        return state.state != "unavailable"
-
-    @property
     def is_on(self) -> bool:
         """Return True if light is on."""
         return self._is_on
@@ -182,7 +172,7 @@ class IRLight(LightEntity):
         if not self._is_on:
             cmd = mappings.get("turn_on") or mappings.get("toggle")
             if cmd:
-                await self._send_command(cmd)
+                await self._send_ir_command(cmd)
             self._is_on = True
 
         # Handle brightness change
@@ -211,7 +201,7 @@ class IRLight(LightEntity):
         mappings = self._config.command_mappings
         cmd = mappings.get("turn_off") or mappings.get("toggle")
         if cmd:
-            await self._send_command(cmd)
+            await self._send_ir_command(cmd)
 
         self._is_on = False
         self._effect = None
@@ -235,7 +225,7 @@ class IRLight(LightEntity):
 
             # Send the discrete level command
             cmd = levels[target_index]
-            await self._send_command(cmd)
+            await self._send_ir_command(cmd)
 
         elif brightness_mode == "relative":
             # Use up/down commands - this is approximate
@@ -249,10 +239,10 @@ class IRLight(LightEntity):
 
                 if diff > 0:
                     for _ in range(steps):
-                        await self._send_command(up_cmd)
+                        await self._send_ir_command(up_cmd)
                 elif diff < 0:
                     for _ in range(steps):
-                        await self._send_command(down_cmd)
+                        await self._send_ir_command(down_cmd)
 
     async def _set_color_temp_kelvin(self, target_kelvin: int) -> None:
         """Set color temperature."""
@@ -270,7 +260,7 @@ class IRLight(LightEntity):
             target_index = max(0, min(target_index, num_levels - 1))
 
             cmd = levels[target_index]
-            await self._send_command(cmd)
+            await self._send_ir_command(cmd)
             self._color_temp_index = target_index
 
         elif mappings.get("color_temp_up") and mappings.get("color_temp_down"):
@@ -282,10 +272,10 @@ class IRLight(LightEntity):
             steps = round(abs(diff) / step_size)
             if diff > 0:  # Cooler (higher Kelvin)
                 for _ in range(steps):
-                    await self._send_command(mappings["color_temp_up"])
+                    await self._send_ir_command(mappings["color_temp_up"])
             elif diff < 0:  # Warmer (lower Kelvin)
                 for _ in range(steps):
-                    await self._send_command(mappings["color_temp_down"])
+                    await self._send_ir_command(mappings["color_temp_down"])
 
     def _index_to_kelvin(self, index: int) -> int:
         """Convert color temp index to Kelvin."""
@@ -308,14 +298,7 @@ class IRLight(LightEntity):
 
         if effect_name in effects:
             cmd = effects[effect_name]
-            await self._send_command(cmd)
-
-    async def _send_command(self, command_name: str) -> None:
-        """Send an IR command."""
-        await self._coordinator.async_send_command(
-            self._virtual_device.id,
-            command_name,
-        )
+            await self._send_ir_command(cmd)
 
     async def _save_state(self) -> None:
         """Persist assumed state to storage."""

@@ -15,6 +15,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .base_entity import IRDeviceEntityMixin
 from .const import DOMAIN, DEVICE_TYPE_COVER
 from .storage import VirtualDevice, EntityConfig
 
@@ -51,7 +52,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class IRCover(CoverEntity):
+class IRCover(IRDeviceEntityMixin, CoverEntity):
     """Cover entity for an IR-controlled cover (projector screen, blinds)."""
 
     _attr_has_entity_name = True
@@ -109,16 +110,6 @@ class IRCover(CoverEntity):
         self._attr_supported_features = features
 
     @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        state = self._coordinator.hass.states.get(
-            self._virtual_device.ir_blaster_entity_id
-        )
-        if state is None:
-            return True
-        return state.state != "unavailable"
-
-    @property
     def is_closed(self) -> bool | None:
         """Return if the cover is closed."""
         return self._is_closed
@@ -133,7 +124,7 @@ class IRCover(CoverEntity):
         mappings = self._config.command_mappings
         cmd = mappings.get("open")
         if cmd:
-            await self._send_command(cmd)
+            await self._send_ir_command(cmd)
 
         self._is_closed = False
         self._position = 100
@@ -145,7 +136,7 @@ class IRCover(CoverEntity):
         mappings = self._config.command_mappings
         cmd = mappings.get("close")
         if cmd:
-            await self._send_command(cmd)
+            await self._send_ir_command(cmd)
 
         self._is_closed = True
         self._position = 0
@@ -157,7 +148,7 @@ class IRCover(CoverEntity):
         mappings = self._config.command_mappings
         cmd = mappings.get("stop")
         if cmd:
-            await self._send_command(cmd)
+            await self._send_ir_command(cmd)
 
         # Position stays at assumed current position
         # Set to middle if was fully open/closed
@@ -166,13 +157,6 @@ class IRCover(CoverEntity):
             self._is_closed = None  # Unknown
         await self._save_state()
         self.async_write_ha_state()
-
-    async def _send_command(self, command_name: str) -> None:
-        """Send an IR command."""
-        await self._coordinator.async_send_command(
-            self._virtual_device.id,
-            command_name,
-        )
 
     async def _save_state(self) -> None:
         """Persist assumed state to storage."""

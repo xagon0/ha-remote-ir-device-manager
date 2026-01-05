@@ -16,6 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .base_entity import IRDeviceEntityMixin
 from .const import DOMAIN
 from .storage import VirtualDevice
 
@@ -47,7 +48,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class VirtualRemoteEntity(RemoteEntity):
+class VirtualRemoteEntity(IRDeviceEntityMixin, RemoteEntity):
     """Remote entity for a virtual IR device."""
 
     _attr_has_entity_name = True
@@ -85,18 +86,6 @@ class VirtualRemoteEntity(RemoteEntity):
     def is_on(self) -> bool:
         """Return True if the remote is on."""
         return self._is_on
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        # Check if the IR blaster entity is available
-        # During startup, state may not exist yet - assume available
-        state = self._coordinator.hass.states.get(
-            self._virtual_device.ir_blaster_entity_id
-        )
-        if state is None:
-            return True
-        return state.state != "unavailable"
 
     @property
     def activity_list(self) -> list[str]:

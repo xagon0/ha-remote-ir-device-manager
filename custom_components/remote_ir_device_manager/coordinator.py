@@ -57,6 +57,16 @@ class IRDeviceCoordinator:
         """Get a virtual device by name."""
         return self._storage.get_device_by_name(name)
 
+    def command_name_exists(self, device_id: str, command_name: str) -> bool:
+        """Check if a command name already exists on a device.
+
+        Use this helper to validate command names in config flows.
+        """
+        device = self._storage.get_device(device_id)
+        if device is None:
+            return False
+        return command_name.lower() in device.commands
+
     async def async_load(self) -> None:
         """Load data from storage."""
         await self._storage.async_load()
